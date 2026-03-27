@@ -3,7 +3,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // Cambia esta URL por la IP de tu servidor o dominio
-export const API_URL = 'https://apibase.gatoslibres.art/api';
+export const API_URL = 'https://apibase.cuerpolibre.cl/api';
 
 const api = axios.create({
     baseURL: API_URL,

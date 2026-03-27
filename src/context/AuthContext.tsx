@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import api from '../api/config';
+import { jwtDecode } from 'jwt-decode';
 
 interface AuthContextData {
     signed: boolean;
@@ -31,7 +32,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ]);
 
                 if (storagedToken) {
-                    setUser({ token: storagedToken });
+                    try {
+                        const payload: any = jwtDecode(storagedToken);
+                        setUser({ token: storagedToken, id: payload.sub });
+                    } catch (e) {
+                        setUser({ token: storagedToken });
+                    }
                 }
                 if (storagedTheme) {
                     setIsDarkMode(storagedTheme === 'dark');
@@ -54,7 +60,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function signIn(email: string, password: string) {
         const response = await api.post('/auth/login', { email, password });
         const { access_token } = response.data;
-        setUser({ token: access_token });
+        const payload: any = jwtDecode(access_token);
+        setUser({ token: access_token, id: payload.sub });
         await SecureStore.setItemAsync('userToken', access_token);
     }
 
@@ -65,7 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function verifyCode(identifier: string, code: string) {
         const response = await api.post('/auth/verify-code', { identifier, code });
         const { access_token } = response.data;
-        setUser({ token: access_token });
+        const payload: any = jwtDecode(access_token);
+        setUser({ token: access_token, id: payload.sub });
         await SecureStore.setItemAsync('userToken', access_token);
     }
 

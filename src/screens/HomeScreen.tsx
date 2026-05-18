@@ -633,11 +633,11 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 80,
     right: 25,
     width: 60,
     height: 60,
-    borderRadius: 20,
+    borderRadius: 30,
     ...Platform.select({
       ios: {
         shadowColor: colors.primary,

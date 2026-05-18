@@ -89,7 +89,8 @@ export const CreateNoteScreen = ({ navigation }: any) => {
             />
 
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
                 style={styles.flex}
             >
                 <View style={styles.header}>
@@ -125,10 +126,10 @@ export const CreateNoteScreen = ({ navigation }: any) => {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView 
-                    style={styles.content} 
+                <ScrollView
+                    style={styles.content}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 40 }}
+                    contentContainerStyle={{ paddingBottom: 120 }}
                 >
                     {/* Workspace Selector */}
                     <View style={styles.section}>

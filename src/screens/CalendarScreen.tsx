@@ -28,6 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { workspaceService, Workspace } from '../api/workspaceService';
+import { cancelAllNotifications, registerForPushNotificationsAsync, scheduleEventNotification } from '../services/NotificationService';
 
 // Habilitar animaciones en Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -61,6 +62,33 @@ export const CalendarScreen = ({ navigation }: any) => {
     const [selectedWsId, setSelectedWsId] = useState<string | null>(null);
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
+    const scheduleAllNotifications = async (eventsData: AgendaEvent[], tasksData: Task[]) => {
+        await cancelAllNotifications();
+        const now = new Date();
+        
+        eventsData.forEach(event => {
+            if (event.event_datetime_local) {
+                const eventDate = new Date(event.event_datetime_local);
+                // Schedule 15 minutes before
+                const triggerDate = new Date(eventDate.getTime() - 15 * 60000);
+                if (triggerDate > now) {
+                    scheduleEventNotification(`Recordatorio: ${event.summary}`, event.location ? `En: ${event.location}` : 'El evento está por comenzar.', triggerDate);
+                }
+            }
+        });
+
+        tasksData.forEach(task => {
+            const dateSource = task.start_date;
+            if (dateSource) {
+                const taskDate = new Date(dateSource);
+                const triggerDate = new Date(taskDate.getTime() - 15 * 60000);
+                if (triggerDate > now) {
+                    scheduleEventNotification('Tarea Pendiente', task.description, triggerDate);
+                }
+            }
+        });
+    };
+
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
@@ -70,6 +98,13 @@ export const CalendarScreen = ({ navigation }: any) => {
             ]);
             setEvents(Array.isArray(eventsData) ? eventsData : []);
             setTasks(Array.isArray(tasksData) ? tasksData : []);
+            
+            // Schedule notifications
+            await scheduleAllNotifications(
+               Array.isArray(eventsData) ? eventsData : [], 
+               Array.isArray(tasksData) ? tasksData : []
+            );
+            
         } catch (error) {
             console.error('Error loading agenda data:', error);
         } finally {
@@ -79,6 +114,7 @@ export const CalendarScreen = ({ navigation }: any) => {
     }, []);
 
     useEffect(() => {
+        registerForPushNotificationsAsync();
         loadData();
         workspaceService.listWorkspaces()
             .then(data => setWorkspaces(data?.workspaces || []))
@@ -325,7 +361,7 @@ export const CalendarScreen = ({ navigation }: any) => {
                 </View>
 
                 <View style={styles.contentContainer}>
-                    <Text style={[styles.summaryText, { color: theme.text }]} numberOfLines={1}>
+                    <Text style={[styles.summaryText, { color: theme.text }]}>
                         {item.summary}
                     </Text>
                     
@@ -518,11 +554,12 @@ export const CalendarScreen = ({ navigation }: any) => {
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={{ width: '100%', justifyContent: 'flex-end' }}
-                    >
+                 <View style={styles.modalOverlay}>
+                     <KeyboardAvoidingView
+                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                         style={{ width: '100%', justifyContent: 'flex-end' }}
+                     >
                         <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
                             <View style={styles.modalHandle} />
                             <View style={styles.modalHeader}>
@@ -558,9 +595,9 @@ export const CalendarScreen = ({ navigation }: any) => {
                                 </TouchableOpacity>
                             </View>
 
-                            <ScrollView 
-                                style={styles.formContent} 
-                                contentContainerStyle={{ paddingBottom: 20 }}
+                            <ScrollView
+                                style={styles.formContent}
+                                contentContainerStyle={{ paddingBottom: 40 }}
                                 showsVerticalScrollIndicator={false}
                             >
                             {/* Workspace Selector */}
@@ -589,59 +626,74 @@ export const CalendarScreen = ({ navigation }: any) => {
                             )}
                             {createType === 'event' ? (
                                 <>
-                                    <Input 
-                                        label="Título" 
-                                        value={summary} 
-                                        onChangeText={setSummary} 
-                                        placeholder="Ej: Reunión de estrategia" 
+                                    <Input
+                                        label="Título"
+                                        value={summary}
+                                        onChangeText={setSummary}
+                                        placeholder="Ej: Reunión de estrategia"
+                                        theme={isDarkMode ? 'dark' : 'light'}
                                     />
                                     <View style={styles.row}>
-                                        <View style={{ flex: 1.5, marginRight: spacing.sm }}>
-                                            <Input 
-                                                label="Ubicación" 
-                                                value={location} 
-                                                onChangeText={setLocation} 
-                                                placeholder="Lugar o Link"
+                                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                            <Input
+                                                label="Fecha"
+                                                value={eventDate}
+                                                onChangeText={setEventDate}
+                                                theme={isDarkMode ? 'dark' : 'light'}
                                             />
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Input 
-                                                label="Hora" 
-                                                value={eventTime} 
-                                                onChangeText={setEventTime} 
+                                        <View style={{ flex: 1, marginRight: spacing.sm }}>
+                                            <Input
+                                                label="Hora"
+                                                value={eventTime}
+                                                onChangeText={setEventTime}
+                                                theme={isDarkMode ? 'dark' : 'light'}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1.5 }}>
+                                            <Input
+                                                label="Ubicación"
+                                                value={location}
+                                                onChangeText={setLocation}
+                                                placeholder="Lugar o Link"
+                                                theme={isDarkMode ? 'dark' : 'light'}
                                             />
                                         </View>
                                     </View>
-                                    <Input 
-                                        label="Descripción" 
-                                        value={description} 
-                                        onChangeText={setDescription} 
+                                    <Input
+                                        label="Descripción"
+                                        value={description}
+                                        onChangeText={setDescription}
                                         placeholder="Notas adicionales..."
                                         multiline
+                                        theme={isDarkMode ? 'dark' : 'light'}
                                     />
                                 </>
                             ) : (
                                 <>
-                                    <Input 
-                                        label="Descripción de la Tarea" 
-                                        value={description} 
-                                        onChangeText={setDescription} 
-                                        placeholder="Ej: Revisar reporte trimestral" 
+                                    <Input
+                                        label="Descripción de la Tarea"
+                                        value={description}
+                                        onChangeText={setDescription}
+                                        placeholder="Ej: Revisar reporte trimestral"
                                         multiline
+                                        theme={isDarkMode ? 'dark' : 'light'}
                                     />
                                     <View style={styles.row}>
                                         <View style={{ flex: 1, marginRight: spacing.sm }}>
-                                            <Input 
-                                                label="Fecha" 
-                                                value={eventDate} 
-                                                onChangeText={setEventDate} 
+                                            <Input
+                                                label="Fecha"
+                                                value={eventDate}
+                                                onChangeText={setEventDate}
+                                                theme={isDarkMode ? 'dark' : 'light'}
                                             />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Input 
-                                                label="Prioridad (Hora)" 
-                                                value={eventTime} 
-                                                onChangeText={setEventTime} 
+                                            <Input
+                                                label="Prioridad (Hora)"
+                                                value={eventTime}
+                                                onChangeText={setEventTime}
+                                                theme={isDarkMode ? 'dark' : 'light'}
                                             />
                                         </View>
                                     </View>
@@ -843,25 +895,25 @@ const styles = StyleSheet.create({
         opacity: 0.6,
         lineHeight: 20,
     },
-    fab: {
-        position: 'absolute',
-        right: 25,
-        bottom: 30,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        ...Platform.select({
-           ios: {
-              shadowColor: colors.primary,
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.4,
-              shadowRadius: 15,
-           },
-           android: {
-              elevation: 8,
-           }
-        })
-    },
+  fab: {
+    position: 'absolute',
+    right: 25,
+    bottom: 80,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    ...Platform.select({
+       ios: {
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.4,
+          shadowRadius: 15,
+       },
+       android: {
+          elevation: 8,
+       }
+    })
+  },
     fabGradient: {
        width: 60,
        height: 60,

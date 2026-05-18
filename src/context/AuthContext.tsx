@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
     const [isDarkMode, setIsDarkMode] = useState(true);
 
+    // Al iniciar la app, cargar el token y refrescarlo si está próximo a expirar
     useEffect(() => {
         async function loadStorageData() {
             try {
@@ -34,11 +35,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (storagedToken) {
                     try {
                         const payload: any = jwtDecode(storagedToken);
-                        setUser({ token: storagedToken, id: payload.sub });
-                    } catch (e) {
+                        const expiresAt = payload.exp * 1000;
+                        const hoursUntilExpiry = (expiresAt - Date.now()) / (1000 * 60 * 60);
+
+                        if (hoursUntilExpiry <= 0) {
+                            // Token ya expirado — limpiar y mostrar login
+                            await SecureStore.deleteItemAsync('userToken');
+                        } else if (hoursUntilExpiry < 24) {
+                            // Token expira en menos de 24h — refrescar proactivamente
+                            try {
+                                const refreshResponse = await api.post('/auth/refresh-token');
+                                const newToken = refreshResponse.data.access_token;
+                                await SecureStore.setItemAsync('userToken', newToken);
+                                const newPayload: any = jwtDecode(newToken);
+                                setUser({ token: newToken, id: newPayload.sub });
+                            } catch {
+                                // Refresh falló pero el token aún es válido, usarlo
+                                setUser({ token: storagedToken, id: payload.sub });
+                            }
+                        } else {
+                            // Token válido con tiempo suficiente
+                            setUser({ token: storagedToken, id: payload.sub });
+                        }
+                    } catch {
+                        // No se pudo decodificar, intentar usar el token tal cual
                         setUser({ token: storagedToken });
                     }
                 }
+
                 if (storagedTheme) {
                     setIsDarkMode(storagedTheme === 'dark');
                 }
@@ -50,6 +74,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         loadStorageData();
     }, []);
+
+    // Refrescar el token cada hora para mantener la sesión indefinidamente activa
+    useEffect(() => {
+        if (!user) return;
+
+        const refreshInterval = setInterval(async () => {
+            try {
+                const currentToken = await SecureStore.getItemAsync('userToken');
+                if (!currentToken) {
+                    // El interceptor eliminó el token → sesión terminada
+                    setUser(null);
+                    return;
+                }
+
+                const refreshResponse = await api.post('/auth/refresh-token');
+                const newToken = refreshResponse.data.access_token;
+                await SecureStore.setItemAsync('userToken', newToken);
+                const newPayload: any = jwtDecode(newToken);
+                setUser((prev: any) => ({ ...prev, token: newToken, id: newPayload.sub }));
+            } catch {
+                // Si el token ya no existe en SecureStore, cerrar sesión
+                const tokenStillExists = await SecureStore.getItemAsync('userToken');
+                if (!tokenStillExists) {
+                    setUser(null);
+                }
+            }
+        }, 60 * 60 * 1000); // cada hora
+
+        return () => clearInterval(refreshInterval);
+    }, [!!user]);
 
     const toggleTheme = async () => {
         const newMode = !isDarkMode;

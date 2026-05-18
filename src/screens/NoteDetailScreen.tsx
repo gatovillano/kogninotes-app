@@ -8,6 +8,7 @@ import {
     ScrollView,
     ActivityIndicator,
     TouchableOpacity,
+    KeyboardAvoidingView,
     Platform,
 } from 'react-native';
 import { MarkdownWysiwygEditor } from '../components/MarkdownWysiwygEditor';
@@ -132,25 +133,30 @@ export const NoteDetailScreen = ({ route, navigation }: any) => {
         </View>
     );
 
-    return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { borderBottomColor: theme.border + '30' }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                    <ChevronLeft size={24} color={theme.text} />
-                </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                   <SaveStatusIndicator />
-                </View>
-                <TouchableOpacity style={styles.iconBtn}>
-                    <Share2 size={20} color={theme.textMuted} />
-                </TouchableOpacity>
-            </View>
+     return (
+         <View style={[styles.container, { backgroundColor: theme.background }]}>
+              <KeyboardAvoidingView
+                  behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                  keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
+                  style={{ flex: 1 }}
+              >
+                 <View style={[styles.header, { borderBottomColor: theme.border + '30' }]}>
+                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                         <ChevronLeft size={24} color={theme.text} />
+                     </TouchableOpacity>
+                     <View style={{ flex: 1, alignItems: 'center' }}>
+                        <SaveStatusIndicator />
+                     </View>
+                     <TouchableOpacity style={styles.iconBtn}>
+                         <Share2 size={20} color={theme.textMuted} />
+                     </TouchableOpacity>
+                 </View>
 
-            <ScrollView 
-                contentContainerStyle={styles.content} 
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-            >
+              <ScrollView
+                  contentContainerStyle={[styles.content, { paddingBottom: 120 }]}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.metaRow}>
                     <View style={styles.metaItem}>
                         <Calendar size={13} color={theme.textMuted} />
@@ -181,9 +187,10 @@ export const NoteDetailScreen = ({ route, navigation }: any) => {
                     markdownStyles={markdownStyles}
                     theme={theme}
                     onContentChange={handleContentChange}
-                />
-            </ScrollView>
-        </View>
+                 />
+             </ScrollView>
+             </KeyboardAvoidingView>
+         </View>
     );
 };
 
